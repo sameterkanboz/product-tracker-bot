@@ -71,7 +71,7 @@ def fetch_relevant_product_data(product_url):
         variants = product_data.get("variants", [])
 
         # Create a readable message
-        message = f"🛍️ **Ürün Takibi Başlatıldı!**\n\n"
+        message = f"🛍️ **Ürün Takibi Güncellemesi!**\n\n"
         message += f"**Ürün Adı**: {product_data.get('name', 'Ürün adı mevcut değil')}\n"
         message += f"**Fiyat**: {price} {currency}\n\n"
         message += "📏 **Mevcut Bedenler ve Stok Durumu:**\n"
@@ -128,8 +128,55 @@ def handle_message(update: Update, context: CallbackContext):
             f"Tracking updated for product: {latest_product_url}")
         # Send product info right away after receiving the URL
         send_product_data()
+        send_dior_product_data()
     else:
         update.message.reply_text("Please send a valid product URL.")
+
+
+def fetch_dior_product_data():
+    """
+    Fetch product data for the Dior Forever Cushion Sponge and format the result.
+    """
+    api_url = "https://tr.dior.com/products/dior-forever-cushion-sponge.js"
+    try:
+        response = requests.get(api_url, headers={"Referrer-Policy": "strict-origin-when-cross-origin"})
+        response.raise_for_status()
+        product_data = response.json()
+
+        # Extract relevant fields
+        title = product_data.get("title", "Ürün adı mevcut değil")
+        price = product_data.get("price", "N/A") / 100  # Convert from smallest currency unit
+        available = product_data.get("available", False)
+
+        availability = "✅ Stokta var" if available else "❌ Stokta yok"
+
+        # Format message
+        message = f"🎀 **Dior Ürün Kontrolü**\n\n"
+        message += f"**Ürün Adı**: {title}\n"
+        message += f"**Fiyat**: {price} TL\n"
+        message += f"**Durum**: {availability}\n"
+
+        return message
+
+    except requests.exceptions.HTTPError as err:
+        return f"HTTP error occurred: {err}"
+    except Exception as err:
+        return f"Other error occurred: {err}"
+
+
+def send_dior_product_data():
+    """
+    Fetch and send the Dior product data to the specified Telegram chat.
+    """
+    data_message = fetch_dior_product_data()
+    try:
+        bot.send_message(chat_id=CHAT_ID, text=data_message, parse_mode='Markdown')
+        print("Dior product message sent successfully")
+    except TelegramError as e:
+        print(f"Failed to send Dior product message: {e}")
+
+# Schedule Dior product check every hour
+schedule.every().hour.at(":30").do(send_dior_product_data)
 
 
 # Setup scheduled job to send product data every hour
